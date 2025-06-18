@@ -21,6 +21,16 @@
 static unsigned long last_update_time_us = 0; // Global variable to store the last update time in microseconds
 CubeFace_e current_face;                      // Global variable to hold the current face of the cube based on roll and pitch
 
+// Adicionar um filtro de média móvel para o yaw
+#define YAW_FILTER_SIZE 5
+float yaw_history[YAW_FILTER_SIZE];
+int yaw_index = 0;
+
+// Adicionar offset de calibração
+float yaw_offset = 0;
+
+#define YAW_THRESHOLD 5.0
+
 /**
  * @brief Initialize the MPU6050 sensor.
  */
@@ -187,5 +197,24 @@ void updateOrientation(MPU6050_data_t *data)
         ALPHA * (data->pitch + gy_dps * dt) + (1.0f - ALPHA) * pitch_accel;
 
     // Para Yaw (propenso a drift)
-    data->yaw += gz_dps * dt;
+    data->yaw = (atan2(ay_g, ax_g) * RAD_TO_DEG) - yaw_offset;
+
+    // Normalização para valores entre 0 e 360
+    float normalized_yaw = data->yaw;
+    if (normalized_yaw < 0)
+    {
+        normalized_yaw += 360;
+    }
+    int yaw_int = (int)(normalized_yaw / 360 * MAX_ROLL);
+
+    // Adicionar um filtro de média móvel para o yaw
+    yaw_history[yaw_index] = data->yaw;
+    yaw_index = (yaw_index + 1) % YAW_FILTER_SIZE;
+
+    float filtered_yaw = 0;
+    for (int i = 0; i < YAW_FILTER_SIZE; i++)
+    {
+        filtered_yaw += yaw_history[i];
+    }
+    data->yaw = filtered_yaw / YAW_FILTER_SIZE;
 }
