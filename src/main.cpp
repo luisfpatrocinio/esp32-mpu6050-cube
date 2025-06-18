@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "gyro.h"
+#include <ArduinoOTA.h>
 
 // CONFIG
 #define BAUDRATE 115200         // Serial baud rate
@@ -15,6 +16,13 @@
 #include <WiFiUdp.h>
 #define WIFI_SSID "patro"
 #define WIFI_PASSWORD "cafecombiscoito"
+
+// Defina o IP, gateway e máscara desejados:
+// IPAddress local_IP(192, 168, 137, 15); // IP fixo desejado
+// IPAddress gateway(192, 168, 137, 1);   // Gateway da sua rede
+// IPAddress subnet(255, 255, 255, 0);    // Máscara de sub-rede
+// IPAddress primaryDNS(8, 8, 8, 8);      // (opcional) DNS primário
+// IPAddress secondaryDNS(8, 8, 4, 4);    // (opcional) DNS secundário
 
 // UDP config
 unsigned int localUdpPort = 4469;         // ESP32 UDP port
@@ -93,10 +101,10 @@ void checkUDPPackages()
     int packageSize = udp.parsePacket();
     if (packageSize > 0)
     {
-        // Serial.printf("\n>>> Pacote recebido! Tamanho: %d bytes, do IP: %s, Porta: %d\n",
-        //               packageSize,
-        //               udp.remoteIP().toString().c_str(),
-        //               udp.remotePort());
+        Serial.printf("\n>>> Pacote recebido! Tamanho: %d bytes, do IP: %s, Porta: %d\n",
+                      packageSize,
+                      udp.remoteIP().toString().c_str(),
+                      udp.remotePort());
 
         // Cria buffer
         char buffer[255];
@@ -106,7 +114,7 @@ void checkUDPPackages()
             buffer[len] = '\0'; // Null-terminate the string
         }
 
-        // Serial.printf("Package contents: %s\n", buffer);
+        Serial.printf("Package contents: %s\n", buffer);
 
         // Check if the received data is a handshake message
         if (strcmp(buffer, "udp_handshake") == 0)
@@ -117,6 +125,9 @@ void checkUDPPackages()
             connectedToGame = true;
             missedHeartbeats = 0;
             waitingForHeartbeatAck = false;
+
+            // Atualizar udpAddress
+            // udpAddress = udp.remoteIP().toString().c_str(); // Update the UDP address to the sender's IP
         }
 
         // Check for heartbeat response
@@ -136,7 +147,7 @@ void checkUDPPackages()
  */
 void sendUDP(const char *message)
 {
-    // Serial.printf("<<< Enviando pacote para %s:%d -> '%s'\n", udpAddress, udpPort, message);
+    Serial.printf("<<< Enviando pacote para %s:%d -> '%s'\n", udpAddress, udpPort, message);
 
     // Envia o pacote
     udp.beginPacket(udpAddress, udpPort);
@@ -163,6 +174,12 @@ void setup()
     initOrientation(&sensor_data);
     Serial.println("MPU6050 initialized!");
 
+    // // Config Static IP before connect
+    // if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS))
+    // {
+    //     Serial.println("Falha ao configurar IP estático");
+    // }
+
     // Init Wi-fi
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
@@ -179,6 +196,7 @@ void setup()
     }
 
     digitalWrite(LED_BUILTIN, LOW);
+    digitalWrite(LED_PIN, LOW);
     Serial.println("Conectado ao Wi-Fi!");
     Serial.print("Endereço IP: ");
     Serial.println(WiFi.localIP());
@@ -190,6 +208,9 @@ void setup()
         ESP.restart();
     }
 
+    // Setup OTA
+    ArduinoOTA.begin();
+
     // Initialize heartbeat timer
     heartbeatTimer = timerBegin(0, 80, true);                         // Timer 0, prescaler 80 (80MHz/80 = 1MHz), count up
     timerAttachInterrupt(heartbeatTimer, &onHeartbeatTimer, true);    // Attach callback
@@ -199,6 +220,9 @@ void setup()
 
 void loop()
 {
+    // Handle OTA updates
+    ArduinoOTA.handle();
+
     // Check and handle heartbeat flag
     if (heartbeatFlag)
     {
@@ -208,6 +232,7 @@ void loop()
     }
 
     digitalWrite(LED_BUILTIN, connectedToGame); // Turn on LED if connected to game
+    digitalWrite(LED_PIN, connectedToGame);     // Turn on LED if connected to game
 
     // Update sensor data
     updateOrientation(&sensor_data);
@@ -219,9 +244,9 @@ void loop()
     // Print orientation data
     Serial.print("Roll: ");
     Serial.print(sensor_data.roll);
-    Serial.print("°\t Pitch: ");
+    Serial.print("\t Pitch: ");
     Serial.print(sensor_data.pitch);
-    Serial.print("°\t Face: ");
+    Serial.print("\t Face: ");
 
     // Print face name
     switch (current_face)
