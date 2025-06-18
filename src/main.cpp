@@ -7,6 +7,9 @@
 #define HEARTBEAT_INTERVAL 2000 // 2 seconds between heartbeats
 #define MAX_MISSED_HEARTBEATS 3 // Number of missed heartbeats before considering connection lost
 
+// Pins
+#define LED_PIN 17 // Pin for external LED
+
 // Wi-fi config
 #include <WiFi.h>
 #include <WiFiUdp.h>
@@ -145,6 +148,10 @@ void setup()
 {
     Serial.begin(BAUDRATE);
     pinMode(LED_BUILTIN, OUTPUT);
+
+    // Setup LED
+    pinMode(LED_PIN, OUTPUT);
+
     while (!Serial)
     {
         delay(10);
@@ -163,8 +170,10 @@ void setup()
     while (WiFi.status() != WL_CONNECTED)
     {
         digitalWrite(LED_BUILTIN, HIGH);
+        digitalWrite(LED_PIN, HIGH);
         delay(250);
         digitalWrite(LED_BUILTIN, LOW);
+        digitalWrite(LED_PIN, LOW);
         delay(250);
         Serial.print(".");
     }
