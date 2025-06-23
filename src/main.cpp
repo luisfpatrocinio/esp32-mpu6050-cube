@@ -49,6 +49,9 @@ volatile uint8_t missedHeartbeats = 0;
 volatile bool waitingForHeartbeatAck = false;
 volatile bool heartbeatFlag = false; // Flag to trigger heartbeat in main loop
 
+// Adicione no início do arquivo, junto das variáveis globais:
+unsigned long disconnectedSince = 0;
+
 // Function prototypes
 void checkUDPPackages();
 bool initUDP();
@@ -188,18 +191,21 @@ void setup()
     {
         digitalWrite(LED_BUILTIN, HIGH);
         digitalWrite(LED_PIN, HIGH);
-        delay(250);
+        delay(69);
         digitalWrite(LED_BUILTIN, LOW);
         digitalWrite(LED_PIN, LOW);
-        delay(250);
+        delay(69);
         Serial.print(".");
     }
 
     digitalWrite(LED_BUILTIN, LOW);
-    digitalWrite(LED_PIN, LOW);
+    digitalWrite(LED_PIN, HIGH);
     Serial.println("Conectado ao Wi-Fi!");
     Serial.print("Endereço IP: ");
     Serial.println(WiFi.localIP());
+
+    delay(1069); // Small delay
+    digitalWrite(LED_PIN, LOW);
 
     // Initialize UDP
     if (!initUDP())
@@ -293,6 +299,24 @@ void loop()
     char roll_pitch_str[32];
     snprintf(roll_pitch_str, sizeof(roll_pitch_str), "R|%d|%d|%d", roll_int, pitch_int, yaw_int);
     sendUDP(roll_pitch_str);
+
+    // Lógica de reconexão e reinício
+    if (!connectedToGame)
+    {
+        if (disconnectedSince == 0)
+        {
+            disconnectedSince = millis();
+        }
+        else if (millis() - disconnectedSince > 20000)
+        { // 20 segundos
+            Serial.println("[RESTART] Desconectado por 20 segundos. Reiniciando...");
+            ESP.restart();
+        }
+    }
+    else
+    {
+        disconnectedSince = 0;
+    }
 
     delay(30); // Small delay
 }
